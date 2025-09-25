@@ -21,16 +21,15 @@ String.prototype.leadFinder = function() {
 }
 
 class Game {
-  constructor(homeTeam, awayTeam) {
-    this.awayFG = 0;
-    this.homeFG = 0;
-    this.awayFT = 0;
-    this.homeFT = 0;
+  constructor(homeTeam, awayTeam, dateString) {
+    this.date = new Date(dateString);
     this.homeTeam = homeTeam;
     this.awayTeam = awayTeam;
     this.allEvents = [];
     this.homeLineups = {};
     this.awayLineups = {};
+    this.homePoints = 0;
+    this.awayPoints = 0;
     this.players = {};
     this.teamStats = {
       home: {
@@ -69,7 +68,7 @@ class Game {
       shotsInPaint: {made: 0, attempted: 0},
       pointsInPaint: 0,
       fastbreakOpportunities: {made: 0, attempted: 0},
-      fastBreakPoints: 0,
+      fastbreakPoints: 0,
     };
 
     this.currentHomeLineupStats = {
@@ -89,7 +88,7 @@ class Game {
       shotsInPaint: {made: 0, attempted: 0},
       pointsInPaint: 0,
       fastbreakOpportunities: {made: 0, attempted: 0},
-      fastBreakPoints: 0,
+      fastbreakPoints: 0,
     };
     this.homePosessions = 0;
     this.awayPosessions = 0;
@@ -102,6 +101,7 @@ class Game {
     // Initialize all starting players
     homeLineup.forEach(player => this.initializePlayerIfNeeded(player, this.homeTeam));
     awayLineup.forEach(player => this.initializePlayerIfNeeded(player, this.awayTeam));
+    
   }
 
   // Process a single game event
@@ -352,26 +352,31 @@ class Game {
   }
 
   processAttributes(attribute, shot, team, made) {
+    // Extract shot type from the cleaned shot string
+    const shotType = shot.includes("FT") ? "FT" : shot.includes("3PTR") ? "3PTR" : "2PTR";
+    
     if(made) {
       if(attribute === "fastbreak") {
         if(team === this.awayTeam) {
           this.currentAwayLineupStats.fastbreakOpportunities.made++;
           this.currentAwayLineupStats.fastbreakOpportunities.attempted++;
-          this.currentAwayLineupStats.fastBreakPoints += shot === "FT" ? 1 : shot === "3PTR" ? 3 : 2;
+          const points = shotType === "FT" ? 1 : shotType === "3PTR" ? 3 : 2;
+          this.currentAwayLineupStats.fastbreakPoints += points;
         } else {
           this.currentHomeLineupStats.fastbreakOpportunities.made++;
           this.currentHomeLineupStats.fastbreakOpportunities.attempted++;
-          this.currentHomeLineupStats.fastBreakPoints += shot === "FT" ? 1 : shot === "3PTR" ? 3 : 2;
+          const points = shotType === "FT" ? 1 : shotType === "3PTR" ? 3 : 2;
+          this.currentHomeLineupStats.fastbreakPoints += points;
         }
       } else if(attribute === "in the paint") {
         if(team === this.awayTeam) {
           this.currentAwayLineupStats.shotsInPaint.made++;
           this.currentAwayLineupStats.shotsInPaint.attempted++;
-          this.currentAwayLineupStats.pointsInPaint += shot === "FT" ? 1 : shot === "3PTR" ? 3 : 2;
+          this.currentAwayLineupStats.pointsInPaint += 2;
         } else {
           this.currentHomeLineupStats.shotsInPaint.made++;
           this.currentHomeLineupStats.shotsInPaint.attempted++;
-          this.currentHomeLineupStats.pointsInPaint += shot === "FT" ? 1 : shot === "3PTR" ? 3 : 2;
+          this.currentHomeLineupStats.pointsInPaint += 2;
         }
       }
     } else {
@@ -405,12 +410,10 @@ class Game {
         this.players[player].freeThrows.made++;
         this.players[player].freeThrows.attempted++;
         if(team === this.awayTeam) {
-          this.awayFT++;
           this.processAwayPoints(player, "FT");
           this.currentAwayLineupStats.freeThrows.made++;
           this.currentAwayLineupStats.freeThrows.attempted++;
         } else {
-          this.homeFT++;
           this.processHomePoints(player, "FT");
           this.currentHomeLineupStats.freeThrows.made++;
           this.currentHomeLineupStats.freeThrows.attempted++;
@@ -421,14 +424,12 @@ class Game {
         this.players[player].threePointers.made++;
         this.players[player].threePointers.attempted++;
         if(team === this.awayTeam) {
-          this.awayFG++;
           this.processAwayPoints(player, "3PTR");
           this.currentAwayLineupStats.fieldGoals.made++;
           this.currentAwayLineupStats.fieldGoals.attempted++;
           this.currentAwayLineupStats.threePointers.made++;
           this.currentAwayLineupStats.threePointers.attempted++;
         } else {
-          this.homeFG++;
           this.processHomePoints(player, "3PTR");
           this.currentHomeLineupStats.fieldGoals.made++;
           this.currentHomeLineupStats.fieldGoals.attempted++;
@@ -439,12 +440,10 @@ class Game {
           this.players[player].fieldGoals.made++;
           this.players[player].fieldGoals.attempted++;
           if(team === this.awayTeam) {
-            this.awayFG++;
             this.processAwayPoints(player, "2PTR");
             this.currentAwayLineupStats.fieldGoals.made++;
             this.currentAwayLineupStats.fieldGoals.attempted++;
           } else {
-            this.homeFG++;
             this.processHomePoints(player, "2PTR");
             this.currentHomeLineupStats.fieldGoals.made++;
             this.currentHomeLineupStats.fieldGoals.attempted++;
@@ -490,30 +489,24 @@ class Game {
       // Handle FTs
       this.players[player].freeThrows.attempted++;
       if(team === this.awayTeam) {
-        this.awayFT++;
         this.currentAwayLineupStats.freeThrows.attempted++;
       } else {
-        this.homeFT++;
         this.currentHomeLineupStats.freeThrows.attempted++;
       }
     } else if(shotString.cleanedShotString.includes("3PTR")) {
       this.players[player].threePointers.attempted++;
       if(team === this.awayTeam) {
-        this.awayFG++;
         this.currentAwayLineupStats.threePointers.attempted++;
         this.currentAwayLineupStats.fieldGoals.attempted++;
       } else {
-        this.homeFG++;
         this.currentHomeLineupStats.threePointers.attempted++;
         this.currentHomeLineupStats.fieldGoals.attempted++;
       }
     } else {
       this.players[player].fieldGoals.attempted++;
       if(team === this.awayTeam) {
-        this.awayFG++;
         this.currentAwayLineupStats.fieldGoals.attempted++;
       } else {
-        this.homeFG++;
         this.currentHomeLineupStats.fieldGoals.attempted++;
       }
     }
@@ -547,7 +540,7 @@ class Game {
         shotsInPaint: {made: 0, attempted: 0},
         pointsInPaint: 0,
         fastbreakOpportunities: {made: 0, attempted: 0},
-        fastBreakPoints: 0,
+        fastbreakPoints: 0,
       };
     }
   }
@@ -579,7 +572,6 @@ class Game {
       
       // Collect all SUB OUT and SUB IN events at the same time
       while (j >= 0 && j < this.allEvents.length && this.allEvents[j]["Time"] === event["Time"] && this.eventsContainSubs(j)) {
-        // console.log("events process by subs", this.allEvents[j]);
         // Away team substitutions
         if (this.allEvents[j]["Away"] && this.allEvents[j]["Away"].includes("SUB OUT")) {
           const playerOut = this.allEvents[j]["Away"].replace("SUB OUT by ", "").replace(/,/g, " ");
@@ -614,10 +606,13 @@ class Game {
 
   // Record the current lineup's plus-minus performance and rebounds
   recordHomeLineupPerformance() {
-    const lineupKey = this.currentHomeLineup.join(', ');
+    // console.log("lineup before sorting", this.currentHomeLineup);
+    const lastNames = this.sortLastNames(this.currentHomeLineup);
+    // console.log("lineup after sorting:", lastNames);
+    const lineupKey = lastNames.join(', ');
     if (!(lineupKey in this.homeLineups)) {
-      this.awayLineups[lineupKey].against = this.awayTeam;
-      this.homeLineups[lineupKey] = this.currentHomeLineupStats;
+      this.homeLineups[lineupKey] = { ...this.currentHomeLineupStats };
+      this.homeLineups[lineupKey].against = this.awayTeam;
     } else {
       this.homeLineups[lineupKey].points += this.currentHomeLineupStats.points;
       this.homeLineups[lineupKey].assists += this.currentHomeLineupStats.assists;
@@ -628,10 +623,16 @@ class Game {
       this.homeLineups[lineupKey].rebounds.total += this.currentHomeLineupStats.rebounds.total;
       this.homeLineups[lineupKey].rebounds.offensive += this.currentHomeLineupStats.rebounds.offensive;
       this.homeLineups[lineupKey].rebounds.defensive += this.currentHomeLineupStats.rebounds.defensive;
-      this.homeLineups[lineupKey].fieldGoals.attempted = this.currentHomeLineupStats.fieldGoals.made;
-      this.homeLineups[lineupKey].fieldGoals.attempted = this.currentHomeLineupStats.fieldGoals.attempted;
-      this.homeLineups[lineupKey].freeThrows.attempted = this.currentHomeLineupStats.freeThrows.attempted
-    this.homeLineups[lineupKey].freeThrows.made = this.currentHomeLineupStats.freeThrows.made;
+      this.homeLineups[lineupKey].fieldGoals.made += this.currentHomeLineupStats.fieldGoals.made;
+      this.homeLineups[lineupKey].fieldGoals.attempted += this.currentHomeLineupStats.fieldGoals.attempted;
+      this.homeLineups[lineupKey].freeThrows.attempted += this.currentHomeLineupStats.freeThrows.attempted
+      this.homeLineups[lineupKey].freeThrows.made += this.currentHomeLineupStats.freeThrows.made;
+      this.homeLineups[lineupKey].fastbreakPoints += this.currentHomeLineupStats.fastbreakPoints;
+      this.homeLineups[lineupKey].fastbreakOpportunities.made += this.currentHomeLineupStats.fastbreakOpportunities.made;
+      this.homeLineups[lineupKey].fastbreakOpportunities.attempted += this.currentHomeLineupStats.fastbreakOpportunities.attempted;
+      this.homeLineups[lineupKey].pointsInPaint += this.currentHomeLineupStats.pointsInPaint;
+
+      
     }
     this.currentHomeLineupStats = {
       against: "",
@@ -649,13 +650,16 @@ class Game {
       shotsInPaint: {made: 0, attempted: 0},
       pointsInPaint: 0,
       fastbreakOpportunities: {made: 0, attempted: 0},
-      fastBreakPoints: 0,
+      fastbreakPoints: 0,
     }
   }
 recordAwayLineupPerformance() {
-  const lineupKey = this.currentAwayLineup.join(', ');
+  // console.log("lineup before sorting", this.currentAwayLineup);
+  const lastNames = this.sortLastNames(this.currentAwayLineup);
+  // console.log("lineup after sorting:", lastNames);
+  const lineupKey = lastNames.join(', ');
   if (!(lineupKey in this.awayLineups)) {
-    this.awayLineups[lineupKey] = this.currentAwayLineupStats;
+    this.awayLineups[lineupKey] = { ...this.currentAwayLineupStats };
     this.awayLineups[lineupKey].against = this.homeTeam;
   } else {
     this.awayLineups[lineupKey].points += this.currentAwayLineupStats.points;
@@ -671,6 +675,10 @@ recordAwayLineupPerformance() {
     this.awayLineups[lineupKey].fieldGoals.attempted += this.currentAwayLineupStats.fieldGoals.attempted
     this.awayLineups[lineupKey].freeThrows.attempted += this.currentAwayLineupStats.freeThrows.attempted
     this.awayLineups[lineupKey].freeThrows.made += this.currentAwayLineupStats.freeThrows.made;
+    this.awayLineups[lineupKey].fastbreakPoints += this.currentAwayLineupStats.fastbreakPoints;
+    this.awayLineups[lineupKey].fastbreakOpportunities.made += this.currentAwayLineupStats.fastbreakOpportunities.made;
+    this.awayLineups[lineupKey].fastbreakOpportunities.attempted += this.currentAwayLineupStats.fastbreakOpportunities.attempted;
+    this.awayLineups[lineupKey].pointsInPaint += this.currentAwayLineupStats.pointsInPaint;
   }
 
   this.currentAwayLineupStats = {
@@ -689,49 +697,10 @@ recordAwayLineupPerformance() {
     shotsInPaint: {made: 0, attempted: 0},
     pointsInPaint: 0,
     fastbreakOpportunities: {made: 0, attempted: 0},
-    fastBreakPoints: 0,
+    fastbreakPoints: 0,
   }
 };
 
-recordHomeLineupPerformance() {
-  const lineupKey = this.currentHomeLineup.join(', ');
-  if (!(lineupKey in this.homeLineups)) {
-    this.homeLineups[lineupKey] = this.currentHomeLineupStats;
-    this.homeLineups[lineupKey].against = this.awayTeam;
-  } else {
-    this.homeLineups[lineupKey].points += this.currentHomeLineupStats.points;
-    this.homeLineups[lineupKey].assists += this.currentHomeLineupStats.assists;
-    this.homeLineups[lineupKey].steals += this.currentHomeLineupStats.steals;
-    this.homeLineups[lineupKey].blocks += this.currentHomeLineupStats.blocks;
-    this.homeLineups[lineupKey].turnovers += this.currentHomeLineupStats.turnovers;
-    this.homeLineups[lineupKey].fouls += this.currentHomeLineupStats.fouls;
-    this.homeLineups[lineupKey].rebounds.total += this.currentHomeLineupStats.rebounds.total;
-    this.homeLineups[lineupKey].rebounds.offensive += this.currentHomeLineupStats.rebounds.offensive;
-    this.homeLineups[lineupKey].rebounds.defensive += this.currentHomeLineupStats.rebounds.defensive;
-    this.homeLineups[lineupKey].fieldGoals.made += this.currentHomeLineupStats.fieldGoals.made;
-    this.homeLineups[lineupKey].fieldGoals.attempted += this.currentHomeLineupStats.fieldGoals.attempted;
-    this.homeLineups[lineupKey].freeThrows.attempted += this.currentHomeLineupStats.freeThrows.attempted;
-    this.homeLineups[lineupKey].freeThrows.made += this.currentHomeLineupStats.freeThrows.made;
-  }
-  this.currentHomeLineupStats = {
-    against: "",
-    points: 0,
-    rebounds: { offensive: 0, defensive: 0, total: 0 },
-    assists: 0,
-    steals: 0,
-    blocks: 0,
-    turnovers: 0,
-    fouls: 0,
-    fieldGoals: { made: 0, attempted: 0 },
-    threePointers: { made: 0, attempted: 0 },
-    freeThrows: { made: 0, attempted: 0 },
-    // Shot locations
-    shotsInPaint: {made: 0, attempted: 0},
-    pointsInPaint: 0,
-    fastbreakOpportunities: {made: 0, attempted: 0},
-    fastBreakPoints: 0,
-  }
-};
 
   applyHomeSubstitutions(substitutions) {
     for (const sub of substitutions) {
@@ -748,11 +717,20 @@ recordHomeLineupPerformance() {
     for (let k = 0; k < this.currentHomeLineup.length; k++) {
       if (this.currentHomeLineup[k] === null && inIndex < substitutions.filter(s => s.type === 'IN').length) {
         const incomingPlayer = substitutions.filter(s => s.type === 'IN')[inIndex].player;
-        this.currentHomeLineup[k] = incomingPlayer;
+        
+        // Validate that the incoming player belongs to the home team
         this.initializePlayerIfNeeded(incomingPlayer, this.homeTeam);
+        if (this.players[incomingPlayer].team !== this.homeTeam) {
+          console.warn(`WARNING: Player ${incomingPlayer} is not on the home team (${this.homeTeam}). Skipping substitution.`);
+          inIndex++;
+          continue;
+        }
+        
+        this.currentHomeLineup[k] = incomingPlayer;
         inIndex++;
       }
     }
+
 
   }
   // Apply substitutions to the current lineup
@@ -772,9 +750,16 @@ recordHomeLineupPerformance() {
     for (let k = 0; k < this.currentAwayLineup.length; k++) {
       if (this.currentAwayLineup[k] === null && inIndex < substitutions.filter(s => s.type === 'IN').length) {
         const incomingPlayer = substitutions.filter(s => s.type === 'IN')[inIndex].player;
-        this.currentAwayLineup[k] = incomingPlayer;
-        // Initialize the incoming player
+        
+        // Validate that the incoming player belongs to the away team
         this.initializePlayerIfNeeded(incomingPlayer, this.awayTeam);
+        if (this.players[incomingPlayer].team !== this.awayTeam) {
+          console.warn(`WARNING: Player ${incomingPlayer} is not on the away team (${this.awayTeam}). Skipping substitution.`);
+          inIndex++;
+          continue;
+        }
+        
+        this.currentAwayLineup[k] = incomingPlayer;
         inIndex++;
       }
     }
@@ -783,46 +768,6 @@ recordHomeLineupPerformance() {
   extractPlayer(eventString) {
     const actionByPlayerRegex = /[A-Z0-9\s]+by\s+/gi;
     return eventString.replace(actionByPlayerRegex, "").replace(/,/g, " ");
-  }
-
-  // Find the best performing lineup
-  findBestLineup() {
-    let highestValue = -Infinity;
-    let bestLineup = null;
-
-    for (const lineup in this.awayLineups) {
-      if (this.awayLineups[lineup].plusMinus > highestValue) {
-        highestValue = this.awayLineups[lineup].plusMinus;
-        bestLineup = lineup;
-      }
-    }
-    return { 
-      lineup: bestLineup, 
-      plusMinus: highestValue,
-      rebounds: this.awayLineups[bestLineup] ? this.awayLineups[bestLineup].rebounds : null
-    };
-  }
-
-  calculateAwayStats() {
-    // Summarize lineups stats
-    for (const lineup in this.awayLineups) {
-      const data = this.awayLineups[lineup];
-      // data.points = data.fieldGoals.made * 2 + data.threePointers.made * 3 + data.freeThrows.made;
-      // data.rebounds.total = data.rebounds.offensive + data.rebounds.defensive;
-    }
-    return this.awayLineups;
-  }
-
-  // Calculate net plus-minus for a specific player
-  getPlayerNetPlusMinus(playerName) {
-    let netPlusMinus = 0;
-    
-    for (const lineup in this.awayLineups) {
-      if (lineup.toLowerCase().includes(playerName.toLowerCase())) {
-        netPlusMinus += this.awayLineups[lineup].plusMinus;
-      }
-    }
-    return netPlusMinus;
   }
 
   // Calculate total rebounds for a specific player
@@ -876,28 +821,6 @@ recordHomeLineupPerformance() {
 
   getAwayPlayers() {
     return Object.keys(this.players).filter(playerName => this.players[playerName].team.toLowerCase() === this.awayTeam.toLowerCase());
-  }
-
-  getHomePlayers() {
-    let homePlayers = [];
-    Object.keys(this.players).forEach(playerName => {
-      const player = this.players[playerName];
-      if(player.team && player.team.toLowerCase() === this.homeTeam.toLowerCase()) {
-        homePlayers.push(player);
-      }
-    })
-    return homePlayers;
-  }
-
-  getAwayPlayers() {
-    let awayPlayers = [];
-    Object.keys(this.players).forEach(playerName => {
-      const player = this.players[playerName];
-      if(player.team && player.team.toLowerCase() === this.awayTeam.toLowerCase()) {
-        awayPlayers.push(player);
-      }
-    })
-    return awayPlayers;
   }
 
   // Enhanced lineup search that works with any order of players
@@ -993,32 +916,28 @@ recordHomeLineupPerformance() {
     return results.sort((a, b) => b.matchCount - a.matchCount);
   }
 
-  // Get all unique players from lineups
-  getAllPlayersFromLineups(team = 'away') {
-    const lineupsToSearch = team === 'away' ? this.awayLineups : this.homeLineups;
-    const playerSet = new Set();
-
-    for (const lineupKey of Object.keys(lineupsToSearch)) {
-      const players = lineupKey.split(', ').map(player => 
-        player.trim().toUpperCase().replace(/\s+/g, ' ')
-      );
-      players.forEach(player => playerSet.add(player));
+  calculateTotalPoints() {
+    for(const lineup in this.awayLineups) {
+        this.awayPoints += lineup.points;
     }
 
-    return Array.from(playerSet).sort();
+    for(const lineup in this.homeLineups) {
+        this.homePoints += lineup.points;
+    }
   }
 
-  // Enhanced getLineupData method that tries both teams
-  getLineupDataFlexible(players) {
-    // First try away team
-    let result = this.findLineupByPlayers(players, 'away');
-    if (result) return result;
-
-    // Then try home team
-    result = this.findLineupByPlayers(players, 'home');
-    if (result) return result;
-
-    return null;
+  sortLastNames(players){
+    const arr = [...players];
+    for (let i = 1; i < arr.length; i++) {
+      const key = arr[i];
+      let j = i - 1;
+      while (j >= 0 && arr[j].localeCompare(key) > 0) {
+        arr[j + 1] = arr[j];
+        j--;
+      }
+      arr[j + 1] = key;
+    }
+    return arr;
   }
 
   // Generate CSV file with lineup data
@@ -1035,7 +954,7 @@ recordHomeLineupPerformance() {
       const threePct = data.threePointers.attempted > 0 ? (data.threePointers.made / data.threePointers.attempted * 100).toFixed(1) : '0.0';
       const ftPct = data.freeThrows.attempted > 0 ? (data.freeThrows.made / data.freeThrows.attempted * 100).toFixed(1) : '0.0';
       
-      csvContent.push(`"${this.awayTeam}","${lineup}","${data.against}","${data.points || 0}",${data.rebounds.offensive || 0},${data.rebounds.defensive || 0},${data.rebounds.total || 0},${data.assists || 0},${data.steals || 0},${data.blocks || 0},${data.turnovers || 0},${data.fouls || 0},${data.fieldGoals.made || 0},${data.fieldGoals.attempted || 0},${fgPct},${data.threePointers.made || 0},${data.threePointers.attempted || 0},${threePct},${data.freeThrows.made || 0},${data.freeThrows.attempted || 0},${ftPct},${data.shotsInPaint.made || 0},${data.shotsInPaint.attempted || 0},${data.pointsInPaint || 0},${data.fastbreakOpportunities.made || 0},${data.fastbreakOpportunities.attempted || 0},${data.fastBreakPoints || 0}`);
+      csvContent.push(`"${this.awayTeam}","${lineup}","${data.against}","${data.points || 0}",${data.rebounds.offensive || 0},${data.rebounds.defensive || 0},${data.rebounds.total || 0},${data.assists || 0},${data.steals || 0},${data.blocks || 0},${data.turnovers || 0},${data.fouls || 0},${data.fieldGoals.made || 0},${data.fieldGoals.attempted || 0},${fgPct},${data.threePointers.made || 0},${data.threePointers.attempted || 0},${threePct},${data.freeThrows.made || 0},${data.freeThrows.attempted || 0},${ftPct},${data.shotsInPaint.made || 0},${data.shotsInPaint.attempted || 0},${data.pointsInPaint || 0},${data.fastbreakOpportunities.made || 0},${data.fastbreakOpportunities.attempted || 0},${data.fastbreakPoints || 0}`);
     }
     
     // Add Home team lineups
@@ -1045,12 +964,12 @@ recordHomeLineupPerformance() {
       const threePct = data.threePointers.attempted > 0 ? (data.threePointers.made / data.threePointers.attempted * 100).toFixed(1) : '0.0';
       const ftPct = data.freeThrows.attempted > 0 ? (data.freeThrows.made / data.freeThrows.attempted * 100).toFixed(1) : '0.0';
       
-      csvContent.push(`"${this.homeTeam}","${lineup}","${data.against}","${data.points || 0}",${data.rebounds.offensive || 0},${data.rebounds.defensive || 0},${data.rebounds.total || 0},${data.assists || 0},${data.steals || 0},${data.blocks || 0},${data.turnovers || 0},${data.fouls || 0},${data.fieldGoals.made || 0},${data.fieldGoals.attempted || 0},${fgPct},${data.threePointers.made || 0},${data.threePointers.attempted || 0},${threePct},${data.freeThrows.made || 0},${data.freeThrows.attempted || 0},${ftPct},${data.shotsInPaint.made || 0},${data.shotsInPaint.attempted || 0},${data.pointsInPaint || 0},${data.fastbreakOpportunities.made || 0},${data.fastbreakOpportunities.attempted || 0},${data.fastBreakPoints || 0}`);
+      csvContent.push(`"${this.homeTeam}","${lineup}","${data.against}","${data.points || 0}",${data.rebounds.offensive || 0},${data.rebounds.defensive || 0},${data.rebounds.total || 0},${data.assists || 0},${data.steals || 0},${data.blocks || 0},${data.turnovers || 0},${data.fouls || 0},${data.fieldGoals.made || 0},${data.fieldGoals.attempted || 0},${fgPct},${data.threePointers.made || 0},${data.threePointers.attempted || 0},${threePct},${data.freeThrows.made || 0},${data.freeThrows.attempted || 0},${ftPct},${data.shotsInPaint.made || 0},${data.shotsInPaint.attempted || 0},${data.pointsInPaint || 0},${data.fastbreakOpportunities.made || 0},${data.fastbreakOpportunities.attempted || 0},${data.fastbreakPoints || 0}`);
     }
     
     // Write to file
     fs.writeFileSync(filename, csvContent.join('\n'));
-    console.log(`CSV file created: ${filename}`);
+    console.log("CSV file generated");
   }
 
   // Print game summary
@@ -1061,6 +980,259 @@ recordHomeLineupPerformance() {
     });
     // Away lineups
   }
+
+  async getOrCreatePlayerId(pool, teamId, firstName, lastName) {
+    try {
+      console.log(`Creating/finding player: ${firstName} ${lastName} for team ${teamId}`);
+      
+      // Attempt insert (will do nothing if player already exists)
+      await pool.query(
+        `INSERT INTO players (team_id, first_name, last_name, active)
+         VALUES ($1, $2, $3, TRUE)
+         ON CONFLICT (team_id, first_name, last_name) DO NOTHING`,
+        [teamId, firstName, lastName]
+      );
+      
+      // Then always fetch the id
+      const result = await pool.query(
+        `SELECT id FROM players 
+         WHERE team_id = $1 AND first_name = $2 AND last_name = $3`,
+        [teamId, firstName, lastName]
+      );
+      
+      console.log('Player query result:', result.rows);
+      
+      if (!result.rows || result.rows.length === 0) {
+        throw new Error(`Could not find or create player ${firstName} ${lastName}`);
+      }
+      
+      console.log('Got player ID:', result.rows[0].id);
+      return result.rows[0].id;
+      
+    } catch (error) {
+      console.error(`Error with player ${firstName} ${lastName}:`, error);
+      throw error;
+    }
+  }
+
+  async getOrCreateTeamId(pool, teamName, conference = null) {
+    // Attempt insert (will do nothing if team already exists)
+    await pool.query(
+      'INSERT INTO teams (name, conference) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING',
+      [teamName, conference]
+    );
+    
+    // Then always fetch the id
+    const result = await pool.query(
+      'SELECT id FROM teams WHERE name = $1',
+      [teamName]
+    );
+    
+    return result.rows[0].id;
+  }
+
+
+  async upsertLineupWithMembers(pool, teamId, displayLineup, playerIds) {
+    // sort for canonical 
+    const sorted = [...playerIds].sort((a, b) => a - b);
+    const canonicalKey = sorted.join('-');
+
+    //Upsert
+    await pool.query('BEGIN');
+    try {
+      const lr = await pool.query(
+        `INSERT INTO lineups (team_id, display_lineup, canonical_key)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (team_id, canonical_key) DO UPDATE SET canonical_key = EXCLUDED.canonical_key
+       RETURNING id`,
+        [teamId, displayLineup, canonicalKey]
+      );
+      const lineupId = lr.rows[0].id;
+
+      //bulk insert lineup_players (ignore duplicates)
+      await pool.query(
+        `INSERT INTO lineup_players (lineup_id, player_id) SELECT $1, UNNEST($2::int[]) ON CONFLICT DO NOTHING`,
+        [lineupId, sorted]
+      );
+
+      await pool.query(`COMMIT`);
+      return lineupId;
+    } catch (e) {
+      await pool.query(`ROLLBACK`);
+      throw e;
+    }
+  }
+
+  async saveToDatabase() {
+    const pool = require('./database/connection');
+
+    try {
+      const homeTeamId = await this.getOrCreateTeamId(pool, this.homeTeam);
+      const awayTeamId = await this.getOrCreateTeamId(pool, this.awayTeam);
+      
+      // insert game
+      await pool.query(
+        'INSERT INTO games (home_team_id, away_team_id, game_date, season, home_score, away_score) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (home_team_id, away_team_id, game_date) DO NOTHING',
+        [homeTeamId, awayTeamId, '2025-12-15', '2024-25', this.homePoints, this.awayPoints]
+      );
+      
+      // Then always fetch the game id
+      const gameResult = await pool.query(
+        'SELECT id FROM games WHERE home_team_id = $1 AND away_team_id = $2 AND game_date = $3',
+        [homeTeamId, awayTeamId, '2025-12-15']
+      );
+      const gameId = gameResult.rows[0].id;
+
+      await this.saveAwayLineupsToDatabase(awayTeamId, gameId, pool);
+      await this.saveHomeLineupsToDatabase(homeTeamId, gameId, pool);
+
+      console.log('Game data saved to database succesfully');
+    } catch(error) {
+      console.log('Error saving to database:', error);
+    }
+  }
+  
+  async saveAwayLineupsToDatabase(teamId, gameId, pool) {
+    console.log('=== saveAwayLineupsToDatabase called ===');
+    console.log('awayLineups:', Object.keys(this.awayLineups));
+    
+    for (const [lineupKey, stats] of Object.entries(this.awayLineups)) { 
+      console.log('Processing lineup:', lineupKey);
+      
+      const names = lineupKey.split(", ");
+      console.log('Split names:', names);
+      
+      const playerIds = [];
+      for(const fullName of names) {
+        console.log('Processing player:', fullName);
+        
+        const parts = fullName.trim().split(" ");
+        console.log('Name parts:', parts);
+        
+        const lastName = parts[0];
+        const firstName = parts[1];
+        console.log(`firstName: "${firstName}", lastName: "${lastName}"`);
+        
+        try {
+          const id = await this.getOrCreatePlayerId(pool, teamId, firstName, lastName);
+          console.log('Got player ID:', id);
+          playerIds.push(id);
+        } catch (error) {
+          console.error(`Error getting player ID for ${firstName} ${lastName}:`, error);
+          throw error; // Re-throw to see the full error
+        }
+      }
+      
+      console.log('All player IDs:', playerIds);
+      const lineupId = await this.upsertLineupWithMembers(pool, teamId, lineupKey, playerIds);
+      console.log('Got lineup ID:', lineupId);
+      
+      // Insert lineup game stats with correct column names and order
+      await pool.query(
+        `INSERT INTO lineup_game_stats (
+          lineup_id, team_id, display_lineup, game_id, points_for, points_against, 
+          oreb, dreb, rebounds, assists, steals, blocks, turnovers, fouls,
+          fgm, fga, three_ptr_made, three_ptr_attempted, ftm, fta,
+          shots_in_paint_made, shots_in_paint_attempted, points_in_paint,
+          fastbreak_made, fastbreak_attempted, fastbreak_points
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26) ON CONFLICT (lineup_id, team_id, display_lineup, game_id) DO UPDATE SET
+        points_for = EXCLUDED.points_for,
+        points_against = EXCLUDED.points_against,
+        oreb = EXCLUDED.oreb,
+        dreb = EXCLUDED.dreb,
+        rebounds = EXCLUDED.rebounds,
+        assists = EXCLUDED.assists,
+        steals = EXCLUDED.steals,
+        blocks = EXCLUDED.blocks,
+        turnovers = EXCLUDED.turnovers,
+        fouls = EXCLUDED.fouls,
+        fgm = EXCLUDED.fgm,
+        fga = EXCLUDED.fga,
+        three_ptr_made = EXCLUDED.three_ptr_made,
+        three_ptr_attempted = EXCLUDED.three_ptr_attempted,
+        ftm = EXCLUDED.ftm,
+        fta = EXCLUDED.fta,
+        shots_in_paint_made = EXCLUDED.shots_in_paint_made,
+        shots_in_paint_attempted = EXCLUDED.shots_in_paint_attempted,
+        points_in_paint = EXCLUDED.points_in_paint,
+        fastbreak_made = EXCLUDED.fastbreak_made,
+        fastbreak_attempted = EXCLUDED.fastbreak_attempted,
+        fastbreak_points = EXCLUDED.fastbreak_points`,
+        [
+          lineupId, teamId, lineupKey, gameId, 
+          stats.points || 0, 0, // points_for, points_against
+          stats.rebounds?.offensive || 0, stats.rebounds?.defensive || 0, stats.rebounds?.total || 0,
+          stats.assists || 0, stats.steals || 0, stats.blocks || 0, stats.turnovers || 0, stats.fouls || 0,
+          stats.fieldGoals?.made || 0, stats.fieldGoals?.attempted || 0,
+          stats.threePointers?.made || 0, stats.threePointers?.attempted || 0,
+          stats.freeThrows?.made || 0, stats.freeThrows?.attempted || 0,
+          stats.shotsInPaint?.made || 0, stats.shotsInPaint?.attempted || 0, stats.pointsInPaint || 0,
+          stats.fastbreakOpportunities?.made || 0, stats.fastbreakOpportunities?.attempted || 0, stats.fastbreakPoints || 0
+        ]
+      );
+    }
+  }
+
+  async saveHomeLineupsToDatabase(teamId, gameId, pool) {
+    for (const [lineupKey, stats] of Object.entries(this.homeLineups)) { 
+
+      const names = lineupKey.split(", ");
+      const playerIds = [];
+      for(const fullName of names) {
+        const parts = fullName.trim().split(" ");
+        const lastName = parts[0];
+        const firstName = parts[1];
+        const id = await this.getOrCreatePlayerId(pool, teamId, firstName, lastName);
+        playerIds.push(id);
+      }
+
+      const lineupId = await this.upsertLineupWithMembers(pool, teamId, lineupKey, playerIds)
+
+        // Insert lineup game stats with correct column names and order
+      await pool.query(
+        `INSERT INTO lineup_game_stats (
+          lineup_id, team_id, display_lineup, game_id, points_for, points_against, 
+          oreb, dreb, rebounds, assists, steals, blocks, turnovers, fouls,
+          fgm, fga, three_ptr_made, three_ptr_attempted, ftm, fta,
+          shots_in_paint_made, shots_in_paint_attempted, points_in_paint,
+          fastbreak_made, fastbreak_attempted, fastbreak_points
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)       ON CONFLICT (lineup_id, team_id, display_lineup, game_id) DO UPDATE SET
+        points_for = EXCLUDED.points_for,
+        points_against = EXCLUDED.points_against,
+        oreb = EXCLUDED.oreb,
+        dreb = EXCLUDED.dreb,
+        rebounds = EXCLUDED.rebounds,
+        assists = EXCLUDED.assists,
+        steals = EXCLUDED.steals,
+        blocks = EXCLUDED.blocks,
+        turnovers = EXCLUDED.turnovers,
+        fouls = EXCLUDED.fouls,
+        fgm = EXCLUDED.fgm,
+        fga = EXCLUDED.fga,
+        three_ptr_made = EXCLUDED.three_ptr_made,
+        three_ptr_attempted = EXCLUDED.three_ptr_attempted,
+        ftm = EXCLUDED.ftm,
+        fta = EXCLUDED.fta,
+        shots_in_paint_made = EXCLUDED.shots_in_paint_made,
+        shots_in_paint_attempted = EXCLUDED.shots_in_paint_attempted,
+        points_in_paint = EXCLUDED.points_in_paint,
+        fastbreak_made = EXCLUDED.fastbreak_made,
+        fastbreak_attempted = EXCLUDED.fastbreak_attempted,
+        fastbreak_points = EXCLUDED.fastbreak_points`,
+        [
+          lineupId, teamId, lineupKey, gameId, 
+          stats.points || 0, 0, // points_for, points_against
+          stats.rebounds?.offensive || 0, stats.rebounds?.defensive || 0, stats.rebounds?.total || 0,
+          stats.assists || 0, stats.steals || 0, stats.blocks || 0, stats.turnovers || 0, stats.fouls || 0,
+          stats.fieldGoals?.made || 0, stats.fieldGoals?.attempted || 0,
+          stats.threePointers?.made || 0, stats.threePointers?.attempted || 0,
+          stats.freeThrows?.made || 0, stats.freeThrows?.attempted || 0,
+          stats.shotsInPaint?.made || 0, stats.shotsInPaint?.attempted || 0, stats.pointsInPaint || 0,
+          stats.fastbreakOpportunities?.made || 0, stats.fastbreakOpportunities?.attempted || 0, stats.fastbreakPoints || 0
+        ]
+      );
+    }
+  }
 }
 
 // Main function to run the analysis
@@ -1069,7 +1241,7 @@ async function analyzeGame() {
     const results = [];
     
     // Create game instance
-    const game = new Game('Hamilton', 'Middlebury');
+    const game = new Game('Hamilton', 'Middlebury', '2025-15-02');
     
     // Set starting lineups
     const awayStartingLineup = ["WITHERINGTON EDWARD", "STEVENS SAM", "BRENNAN DAVID", "FLAKS EVAN", "URENA OLIVER"];
@@ -1080,25 +1252,30 @@ async function analyzeGame() {
     fs.createReadStream('data.csv')
       .pipe(csv())
       .on('data', (data) => results.push(data))
-      .on('end', () => {
-        // Store events in game object for processing
-        game.allEvents = results;
-        
-        // Process all events
-        for (let i = 0; i < results.length; i++) {
-          game.processEvent(results[i], i, results);
-        }
-        
-        // Record final lineup performance
-        game.recordHomeLineupPerformance();
-        game.recordAwayLineupPerformance();
-        
-        // Generate outputs
-        // game.printSummary();
+      .on('end', async () => {  // Make this async
+        try {
+          // Store events in game object for processing
+          game.allEvents = results;
+          
+          // Process all events
+          for (let i = 0; i < results.length; i++) {
+            game.processEvent(results[i], i, results);
+          }
+          
+          // Record final lineup performance
+          game.recordHomeLineupPerformance();
+          game.recordAwayLineupPerformance();
 
-        // game.generateLineupCSV('lineups.csv');
-        
-        resolve(game);
+          // Generate outputs
+          // game.generateLineupCSV('lineups.csv');
+          
+          // Save to database
+          await game.saveToDatabase();  // Use .call() to bind 'this'
+          
+          resolve(game);
+        } catch (error) {
+          reject(error);
+        }
       })
       .on('error', reject);
   });
