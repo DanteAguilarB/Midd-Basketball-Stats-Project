@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { analyzeGame } = require('./index.js');
+const dbUtils = require('./database/utils');
 
 const app = express();
 const PORT = 3001;
@@ -13,7 +14,80 @@ app.use(express.json());
 // Serve static files from the frontend build
 app.use(express.static(path.join(__dirname, 'FrontEnd/lineups-tool/dist')));
 
-// API endpoint to get game data
+// Removed table-columns endpoint - using static columns now
+
+// API endpoint to get players by team
+app.get('/api/players/:teamName', async (req, res) => {
+  try {
+    const { teamName } = req.params;
+    const players = await dbUtils.getPlayersByTeam(teamName);
+    res.json({ players });
+  } catch (error) {
+    console.error('Error fetching players:', error);
+    res.status(500).json({ error: 'Failed to fetch players' });
+  }
+});
+
+// API endpoint to get all teams
+app.get('/api/teams', async (req, res) => {
+  try {
+    const teams = await dbUtils.getAllTeams();
+    res.json({ teams });
+  } catch (error) {
+    console.error('Error fetching teams:', error);
+    res.status(500).json({ error: 'Failed to fetch teams' });
+  }
+});
+
+// API endpoint to get lineup data with filters
+app.get('/api/lineup-data', async (req, res) => {
+  try {
+    const filters = {
+      team: req.query.team,
+      season: req.query.season,
+      minGames: req.query.minGames ? parseInt(req.query.minGames) : undefined,
+      limit: req.query.limit ? parseInt(req.query.limit) : 50,
+      offset: req.query.offset ? parseInt(req.query.offset) : 0
+    };
+    
+    const lineupData = await dbUtils.getLineupData(filters);
+    const columns = await dbUtils.getTableColumns();
+    
+    res.json({
+      lineups: lineupData,
+      columns,
+      total: lineupData.length
+    });
+  } catch (error) {
+    console.error('Error fetching lineup data:', error);
+    res.status(500).json({ error: 'Failed to fetch lineup data' });
+  }
+});
+
+// API endpoint to get aggregated lineup stats
+app.get('/api/lineup-aggregates', async (req, res) => {
+  try {
+    const filters = {
+      team: req.query.team,
+      minGames: req.query.minGames ? parseInt(req.query.minGames) : undefined,
+      limit: req.query.limit ? parseInt(req.query.limit) : 50
+    };
+    
+    const aggregatedData = await dbUtils.getAggregatedLineupStats(filters);
+    const columns = await dbUtils.getTableColumns();
+    
+    res.json({
+      lineups: aggregatedData,
+      columns,
+      total: aggregatedData.length
+    });
+  } catch (error) {
+    console.error('Error fetching aggregated lineup data:', error);
+    res.status(500).json({ error: 'Failed to fetch aggregated lineup data' });
+  }
+});
+
+// API endpoint to get game data (legacy - for backward compatibility)
 app.get('/api/game-data', async (req, res) => {
   try {
     console.log('Analyzing game data...');
@@ -84,17 +158,20 @@ app.get('/api/game-data', async (req, res) => {
   }
 });
 
-// API endpoint to get lineup data by player selection
-app.post('/api/lineup-data', async (req, res) => {
+// API endpoint to search lineup by player selection
+app.post('/api/lineup-search', async (req, res) => {
   try {
     const { players, team } = req.body;
     
-    if (!players || players.length !== 5) {
-      return res.status(400).json({ error: 'Exactly 5 players required' });
+    if (!players || players.length === 0) {
+      return res.status(400).json({ error: 'At least one player required' });
     }
     
-    const game = await analyzeGame();
-    const lineupData = game.getLineupData(...players);
+    if (!team) {
+      return res.status(400).json({ error: 'Team name is required' });
+    }
+    
+    const lineupData = await dbUtils.getLineupsByPlayers(players, team);
     
     if (!lineupData) {
       return res.status(404).json({ error: 'Lineup not found' });
@@ -106,8 +183,8 @@ app.post('/api/lineup-data', async (req, res) => {
       team: team
     });
   } catch (error) {
-    console.error('Error getting lineup data:', error);
-    res.status(500).json({ error: 'Failed to get lineup data' });
+    console.error('Error searching lineup:', error);
+    res.status(500).json({ error: 'Failed to search lineup' });
   }
 });
 
