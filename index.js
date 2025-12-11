@@ -551,19 +551,27 @@ class Game {
       };
     }
   }
-  eventsContainSubs(j){
-    if(this.allEvents[j]["Home"].includes("SUB OUT") || this.allEvents[j]["Away"].includes("SUB OUT") || this.allEvents[j]["Home"].includes("SUB IN") || this.allEvents[j]["Away"].includes("SUB IN")) {
-      return true;
+  eventsContainSubs(event){
+    if(typeof event === "number"){
+      if(this.allEvents[event]["Home"].includes("SUB OUT") || this.allEvents[event]["Away"].includes("SUB OUT") || this.allEvents[event]["Home"].includes("SUB IN") || this.allEvents[event]["Away"].includes("SUB IN")) {
+        return true;
+      }
+      return false;
+    } else if(typeof event === "object"){
+      if(event["Home"].includes("SUB OUT") || event["Away"].includes("SUB OUT") || event["Home"].includes("SUB IN") || event["Away"].includes("SUB IN")) {
+        return true;
+      }
+      return false;
     }
-    return false;
   }
 
   // Process substitutions for home team
   processSubstitutions(event) {
-    if ((event["Away"] || event["Home"]) && (event["Away"].includes("SUB OUT") || event["Home"].includes("SUB OUT")) && !event.processed) {
+
+    if ((event["Away"] || event["Home"]) && (this.eventsContainSubs(event)) && !event.processed) {
       // Mark this timestamp as processed to avoid duplicate processing
       event.processed = true;
-
+      
       // Handle multiple substitutions that might occur at the same time
       // We need to find the current event index in the results array
       let j = -1;
@@ -579,7 +587,6 @@ class Game {
       
       // Collect all SUB OUT and SUB IN events at the same time
       while (j >= 0 && j < this.allEvents.length && this.allEvents[j]["Time"] === event["Time"] && this.eventsContainSubs(j)) {
-        // console.log("events process by subs", this.allEvents[j]);
         // Away team substitutions
         if (this.allEvents[j]["Away"] && this.allEvents[j]["Away"].includes("SUB OUT")) {
           const playerOut = this.allEvents[j]["Away"].replace("SUB OUT by ", "").replace(/,/g, " ");
@@ -1069,15 +1076,17 @@ async function analyzeGame() {
     const results = [];
     
     // Create game instance
-    const game = new Game('Hamilton', 'Middlebury');
+    const game = new Game('Middlebury', 'Rochester (N.Y.)');
     
     // Set starting lineups
-    const awayStartingLineup = ["WITHERINGTON EDWARD", "STEVENS SAM", "BRENNAN DAVID", "FLAKS EVAN", "URENA OLIVER"];
-    const homeStartingLineup = ["MORGAN HANK","SINGH TEJA","KANE OWEN", "ROBINSON GRAHAM", "XU COOPER"];
+    let awayStartingLineup = ["Adetosoye Tomiwa", "Odibo Justin", "Oprea Corvin", "Razi Luke", "Mayhew John"];
+    const homeStartingLineup = ["MURRAY IAN","FUERBACHER JUSTIN","FLAKS EVAN", "MCKERSIE JACKSON", "WITHERINGTON EDWARD"];
+
+    awayStartingLineup = awayStartingLineup.map((name) => {return name.toUpperCase()});
 
     game.setStartingLineups(homeStartingLineup, awayStartingLineup);
     
-    fs.createReadStream('data.csv')
+    fs.createReadStream('Play by plays - Rochester.csv')
       .pipe(csv())
       .on('data', (data) => results.push(data))
       .on('end', () => {
@@ -1088,7 +1097,7 @@ async function analyzeGame() {
         for (let i = 0; i < results.length; i++) {
           game.processEvent(results[i], i, results);
         }
-        
+
         // Record final lineup performance
         game.recordHomeLineupPerformance();
         game.recordAwayLineupPerformance();
@@ -1096,7 +1105,7 @@ async function analyzeGame() {
         // Generate outputs
         // game.printSummary();
 
-        // game.generateLineupCSV('lineups.csv');
+        game.generateLineupCSV('lineups.csv');
         
         resolve(game);
       })
@@ -1108,6 +1117,7 @@ async function analyzeGame() {
 if (require.main === module) {
   analyzeGame()
     .then(game => {
+      
       console.log('\nAnalysis complete!');
     })
     .catch(error => {
